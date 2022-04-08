@@ -1,0 +1,23 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: enterprise-contract-pipeline
+spec:
+  params:
+    - name: PIPELINE_RUN_NAME
+      type: string
+  results:
+    - name: SUCCESS
+      description: Pass/fail of the contract checks
+      value: $(tasks.verify-contract.results.SUCCESS)
+    - name: FAIL_COUNT
+      description: The number of failed checks
+      value: $(tasks.verify-contract.results.FAIL_COUNT)
+  tasks:
+    - name: verify-contract
+      taskRef:
+        name: enterprise-contract
+        bundle: ENTERPRISE_CONTRACT_TASK_BUNDLE # Will be set by /scripts/run.sh
+      params:
+        - name: PIPELINE_RUN_NAME
+          value: "$(params.PIPELINE_RUN_NAME)"

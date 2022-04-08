@@ -1,0 +1,39 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  annotations:
+    tekton.dev/displayName: Enterprise Contract
+    tekton.dev/pipelines.minVersion: "0.19"
+    tekton.dev/tags: cosign, chains, signature
+  labels:
+    app.kubernetes.io/version: "0.1"
+    operator.tekton.dev/provider-type: redhat
+  name: enterprise-contract
+spec:
+  description: Applies enterprise policies to a pipeline.
+  serviceAccountName: enterprise-contract-sa
+  params:
+    - description: Name of the pipeline run to run policies against.
+      name: PIPELINE_RUN_NAME
+      type: string
+  results:
+    - name: SUCCESS
+      description: Pass/fail if all policies are met
+    - name: FAIL_COUNT
+      description: Number of policy checks that failed
+  steps:
+    - script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        echo "============================ Created the following files ============================"
+        /home/enterprise-contract/ec-policies/scripts/fetch-data.sh "$(params.PIPELINE_RUN_NAME)"
+        echo "============================= Running OPA policy check =============================="
+        /home/enterprise-contract/ec-policies/scripts/validate.sh | tee /home/enterprise-contract/opa-stdout.txt
+        jq '. | length' /home/enterprise-contract/opa-stdout.txt > $(results.FAIL_COUNT.path)
+        if [ $(jq '. | length' /home/enterprise-contract/opa-stdout.txt) == "0" ]; then
+            echo "true" > $(results.SUCCESS.path)
+        else
+            echo "false" > $(results.SUCCESS.path)
+        fi
+      name: verify-contract
+      image: ENTERPRISE_CONTRACT_IMAGE # Will be set by /scripts/build-and-push.sh
